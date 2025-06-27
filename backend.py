@@ -110,9 +110,10 @@ class Backend:
             if new_position not in self.game_state.grid:
                 return False
 
-            # Проверка проходимости (остается, так как это фундаментальное свойство мира)
+            # Проверка проходимости (теперь зависит от юнита)
             target_tile_type = self.game_state.grid[new_position]['tile']
-            if not TILE_PROPERTIES[target_tile_type].is_passable:
+            unit_props = UNIT_PROPERTIES[unit['type']]
+            if not unit_props.can_traverse(target_tile_type):
                  return False
 
             # Проверка дистанции
