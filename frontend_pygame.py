@@ -228,8 +228,7 @@ class PygameFrontend:
                         success = self.backend.found_city(self.selected_unit_id, city_name)
                         if success: self.selected_unit_id = None
                 elif ui_action == 'END_TURN':
-                    print("[Frontend] END TURN action received!")
-                    # self.backend.end_turn() # Когда появится такой метод
+                    self.backend.end_turn()
                 
                 # Если UI обработал клик, дальше ничего не делаем
                 continue 

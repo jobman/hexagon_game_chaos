@@ -11,6 +11,7 @@ class EventType(Enum):
     UNIT_MOVED = auto()
     UNIT_CREATED = auto()
     CITY_FOUNDED = auto()
+    NEXT_PLAYER_TURN = auto()
 
 
 @dataclass

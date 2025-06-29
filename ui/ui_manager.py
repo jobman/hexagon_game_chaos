@@ -54,4 +54,4 @@ class UIManager:
 
     def update(self, selected_object_data):
         """Обновляет состояние панелей (например, панель действий)."""
-        self.action_panel.update(selected_object_data)
+        self.action_panel.update_selected_object(selected_object_data)
