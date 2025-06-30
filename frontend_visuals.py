@@ -1,19 +1,22 @@
-# frontend_visuals.py
 import pygame
 from dataclasses import dataclass, field
 from tile_types import TileType
 from unit_types import UnitType
+from constants import (
+    COLOR_GRASS, COLOR_WATER, COLOR_MOUNTAIN, COLOR_FOREST, COLOR_SAND,
+    COLOR_UNIT_ALLY, COLOR_UNIT_ENEMY, COLOR_HIGHLIGHT, COLOR_FOG
+)
 
 # Словарь, который сопоставляет абстрактный тип тайла с конкретным цветом для отрисовки
 TILE_COLORS = {
-    TileType.GRASS: (100, 150, 100),
+    TileType.GRASS: COLOR_GRASS,
     TileType.PLAINS: (180, 170, 120),
-    TileType.FOREST: (50, 100, 50),
+    TileType.FOREST: COLOR_FOREST,
     TileType.HILLS: (120, 130, 100),
-    TileType.MOUNTAINS: (100, 100, 100),
-    TileType.WATER: (70, 120, 180),
+    TileType.MOUNTAINS: COLOR_MOUNTAIN,
+    TileType.WATER: COLOR_WATER,
     TileType.DEEP_WATER: (40, 80, 150),
-    TileType.SAND: (210, 200, 150),
+    TileType.SAND: COLOR_SAND,
     TileType.DESERT: (200, 180, 100),
     TileType.SNOW: (220, 220, 220),
     TileType.ICE: (180, 200, 250),
@@ -35,9 +38,9 @@ class UnitVisualData:
 # Словарь, который сопоставляет абстрактный тип юнита с его внешним видом
 UNIT_VISUALS = {
     UnitType.SETTLER: UnitVisualData(shape='square', color=(220, 220, 220), symbol='S'),
-    UnitType.WARRIOR: UnitVisualData(shape='circle', color=(200, 50, 50), symbol='W'),
-    UnitType.ARCHER: UnitVisualData(shape='triangle', color=(200, 50, 50), symbol='A'),
-    UnitType.RIFLEMAN: UnitVisualData(shape='circle', color=(50, 70, 50), symbol='R'),
+    UnitType.WARRIOR: UnitVisualData(shape='circle', color=COLOR_UNIT_ENEMY, symbol='W'),
+    UnitType.ARCHER: UnitVisualData(shape='triangle', color=COLOR_UNIT_ENEMY, symbol='A'),
+    UnitType.RIFLEMAN: UnitVisualData(shape='circle', color=COLOR_UNIT_ALLY, symbol='R'),
     UnitType.CANNON: UnitVisualData(shape='square', color=(80, 80, 80), symbol='C'),
     UnitType.MECH: UnitVisualData(shape='square', color=(150, 50, 200), symbol='M'),
     UnitType.CYBER_NINJA: UnitVisualData(shape='triangle', color=(100, 180, 250), symbol='N'),

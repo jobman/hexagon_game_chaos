@@ -3,20 +3,19 @@ import pygame
 from .minimap import Minimap
 from .action_panel import ActionPanel
 from .end_turn_panel import EndTurnPanel
+from constants import SCREEN_WIDTH, SCREEN_HEIGHT
 
 class UIManager:
-    def __init__(self, screen_width, screen_height, backend):
+    def __init__(self, backend):
         self.backend = backend
-        self.screen_width = screen_width
-        self.screen_height = screen_height
 
         # Определяем общую область UI (нижняя четверть экрана)
-        self.ui_rect = pygame.Rect(0, screen_height * 0.75, screen_width, screen_height * 0.25)
+        self.ui_rect = pygame.Rect(0, SCREEN_HEIGHT * 0.75, SCREEN_WIDTH, SCREEN_HEIGHT * 0.25)
         
         # Разбиваем область UI на три части
-        minimap_width = screen_width * 0.25
-        end_turn_width = screen_width * 0.25
-        action_panel_width = screen_width - minimap_width - end_turn_width
+        minimap_width = SCREEN_WIDTH * 0.25
+        end_turn_width = SCREEN_WIDTH * 0.25
+        action_panel_width = SCREEN_WIDTH - minimap_width - end_turn_width
 
         minimap_rect = pygame.Rect(0, self.ui_rect.top, minimap_width, self.ui_rect.height)
         action_panel_rect = pygame.Rect(minimap_width, self.ui_rect.top, action_panel_width, self.ui_rect.height)

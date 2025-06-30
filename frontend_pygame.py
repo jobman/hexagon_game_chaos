@@ -7,9 +7,9 @@ from events import EventType
 from frontend_visuals import TILE_COLORS, DEFAULT_TILE_COLOR, UNIT_VISUALS, DEFAULT_UNIT_VISUAL, CITY_CENTER_COLOR, CITY_NAME_COLOR
 from unit_types import UnitType
 from ui.ui_manager import UIManager
+from constants import SCREEN_WIDTH, SCREEN_HEIGHT
 
 # Константы для отрисовки
-WIDTH, HEIGHT = 800, 600
 CLICK_DRAG_THRESHOLD = 5
 DEFAULT_HEX_SIZE = 30
 MIN_HEX_SIZE = 10
@@ -22,7 +22,7 @@ class PygameFrontend:
     def __init__(self, backend):
         self.backend = backend
         pygame.init()
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Hexagonal TBS")
         self.font = pygame.font.SysFont("Arial", 14)
         self.running = True
@@ -31,7 +31,7 @@ class PygameFrontend:
         self.is_dragging = False
         self.drag_start_pos = None
         self.hex_size = DEFAULT_HEX_SIZE
-        self.ui_manager = UIManager(WIDTH, HEIGHT, backend)
+        self.ui_manager = UIManager(backend)
         self.selected_object_data = None
     
     def _update_selection_data(self):
@@ -71,7 +71,7 @@ class PygameFrontend:
         Возвращает: (диапазон_отсечения, список_угловых_гексов)
         """
         # 1. Находим точные угловые гексы
-        points_to_check = [(0, 0), (WIDTH, 0), (WIDTH, HEIGHT), (0, HEIGHT)]
+        points_to_check = [(0, 0), (SCREEN_WIDTH, 0), (SCREEN_WIDTH, SCREEN_HEIGHT), (0, SCREEN_HEIGHT)]
         corner_hexes = [self._pixel_to_hex(x, y) for x, y in points_to_check]
         
         # 2. На основе углов вычисляем диапазон для быстрой отрисовки
@@ -126,13 +126,13 @@ class PygameFrontend:
     def _hex_to_pixel(self, q, r):
         world_x = self.hex_size * (3.0 / 2.0 * q)
         world_y = self.hex_size * (math.sqrt(3) / 2.0 * q + math.sqrt(3) * r)
-        screen_x = world_x + WIDTH / 2 + self.camera_offset.x
-        screen_y = world_y + HEIGHT / 2 + self.camera_offset.y
+        screen_x = world_x + SCREEN_WIDTH / 2 + self.camera_offset.x
+        screen_y = world_y + SCREEN_HEIGHT / 2 + self.camera_offset.y
         return screen_x, screen_y
 
     def _pixel_to_hex(self, x, y):
-        world_x = x - WIDTH / 2 - self.camera_offset.x
-        world_y = y - HEIGHT / 2 - self.camera_offset.y
+        world_x = x - SCREEN_WIDTH / 2 - self.camera_offset.x
+        world_y = y - SCREEN_HEIGHT / 2 - self.camera_offset.y
         q = (2.0 / 3.0 * world_x) / self.hex_size
         r = (-1.0 / 3.0 * world_x + math.sqrt(3) / 3.0 * world_y) / self.hex_size
         return self._hex_round(q, r)
@@ -164,7 +164,7 @@ class PygameFrontend:
         Возвращает список из 4 кортежей (q,r).
         """
         points_to_check = [
-            (0, 0), (WIDTH, 0), (WIDTH, HEIGHT), (0, HEIGHT)
+            (0, 0), (SCREEN_WIDTH, 0), (SCREEN_WIDTH, SCREEN_HEIGHT), (0, SCREEN_HEIGHT)
         ]
         # Просто конвертируем 4 угла и возвращаем как есть
         visible_hexes = [self._pixel_to_hex(x, y) for x, y in points_to_check]
@@ -242,7 +242,7 @@ class PygameFrontend:
                 if not self.ui_manager.ui_rect.collidepoint(event.pos):
                     if event.button == 4 or event.button == 5:
                         mouse_pos = pygame.math.Vector2(event.pos)
-                        screen_center = pygame.math.Vector2(WIDTH / 2, HEIGHT / 2)
+                        screen_center = pygame.math.Vector2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
                         world_pixel_before_zoom = mouse_pos - screen_center - self.camera_offset
                         old_size = self.hex_size
                         if event.button == 4:

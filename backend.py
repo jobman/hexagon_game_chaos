@@ -30,7 +30,7 @@ class Backend:
 
     def _initialize_game(self):
         """Создает начальное состояние игры."""
-        self.game_state.grid = generate_map(radius=15)
+        self.game_state.grid = generate_map()
         self.create_unit(unit_type=UnitType.SETTLER, player=0, position=(0, 0))
         self.create_unit(unit_type=UnitType.WARRIOR, player=0, position=(0, 1))
         self.create_unit(unit_type=UnitType.RIFLEMAN, player=1, position=(3, -5))
