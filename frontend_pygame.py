@@ -273,7 +273,9 @@ class PygameFrontend:
                     elif event.button == 3:
                         if self.selected_unit_id is not None:
                             clicked_hex = self._pixel_to_hex(*event.pos)
-                            self.backend.move_unit(self.selected_unit_id, clicked_hex)
+                            move_successful = self.backend.move_unit(self.selected_unit_id, clicked_hex)
+                            if move_successful:
+                                self.valid_moves = self.backend.get_valid_moves(self.selected_unit_id)
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1 and self.is_dragging:
                     self.is_dragging = False
