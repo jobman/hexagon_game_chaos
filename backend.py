@@ -2,7 +2,7 @@
 import collections
 from events import Event, EventType
 from map_generator import generate_map
-from hex_utils import hex_distance
+from hex_utils import hex_distance, hex_neighbors
 from tile_types import TileType, TILE_PROPERTIES
 from unit_types import UnitType, UNIT_PROPERTIES, MOVEMENT_COSTS, ENERGY_REGENERATION
 
@@ -122,6 +122,10 @@ class Backend:
         unit = self.game_state.units[unit_id]
         old_position = unit['position']
 
+        # Проверяем, что клетка соседняя
+        if hex_distance(old_position, new_position) != 1:
+            return False
+
         if new_position not in self.game_state.grid:
             return False
 
@@ -144,6 +148,35 @@ class Backend:
             {'unit_id': unit_id, 'from': old_position, 'to': new_position, 'new_energy': unit['energy']}
         )
         return True
+
+    def get_valid_moves(self, unit_id):
+        if unit_id not in self.game_state.units:
+            return []
+
+        unit = self.game_state.units[unit_id]
+        unit_props = UNIT_PROPERTIES[unit['type']]
+        valid_moves = []
+        
+        # Проверяем всех соседей
+        for neighbor in hex_neighbors(unit['position']):
+            # 1. Клетка вообще существует на карте?
+            if neighbor not in self.game_state.grid:
+                continue
+            
+            # 2. Может ли юнит перемещаться по этому типу тайла?
+            target_tile_type = self.game_state.grid[neighbor]['tile']
+            if not unit_props.can_traverse(target_tile_type):
+                continue
+                
+            # 3. Достаточно ли у юнита энергии?
+            move_cost = MOVEMENT_COSTS.get(unit['type'], {}).get(target_tile_type, 999)
+            if unit['energy'] < move_cost:
+                continue
+                
+            # Если все проверки пройдены, добавляем клетку в список
+            valid_moves.append(neighbor)
+            
+        return valid_moves
 
     def get_events(self):
         events = list(self.event_queue)

@@ -33,6 +33,7 @@ class PygameFrontend:
         self.hex_size = DEFAULT_HEX_SIZE
         self.ui_manager = UIManager(backend)
         self.selected_object_data = None
+        self.valid_moves = []
     
     def _update_selection_data(self):
         """Обновляет данные о выбранном объекте для передачи в UI."""
@@ -203,6 +204,16 @@ class PygameFrontend:
                     color = TILE_COLORS.get(tile_type, DEFAULT_TILE_COLOR)
                     self._draw_hex(self.screen, color, q, r)
 
+        # Отрисовка подсветки доступных ходов
+        if self.selected_unit_id is not None:
+            for move in self.valid_moves:
+                # Получаем исходный цвет тайла
+                hex_data = state.grid.get(move)
+                if hex_data:
+                    tile_type = hex_data['tile']
+                    original_color = TILE_COLORS.get(tile_type, DEFAULT_TILE_COLOR)
+                    self._draw_hex(self.screen, original_color, move[0], move[1], border_color=(255, 255, 0), border_width=2)
+
         # Отрисовка городов
         for city_id, city_data in state.cities.items():
             q, r = city_data['center_hex']
@@ -226,7 +237,9 @@ class PygameFrontend:
                     if self.selected_unit_id is not None:
                         city_name = f"Город {self.backend.game_state.next_city_id}"
                         success = self.backend.found_city(self.selected_unit_id, city_name)
-                        if success: self.selected_unit_id = None
+                        if success: 
+                            self.selected_unit_id = None
+                            self.valid_moves = []
                 elif ui_action == 'END_TURN':
                     self.backend.end_turn()
                 
@@ -270,8 +283,10 @@ class PygameFrontend:
                         unit_id = self._get_unit_at_hex(clicked_hex)
                         if unit_id is not None:
                             self.selected_unit_id = unit_id
+                            self.valid_moves = self.backend.get_valid_moves(unit_id)
                         else:
                             self.selected_unit_id = None
+                            self.valid_moves = []
             elif event.type == pygame.MOUSEMOTION:
                 if self.is_dragging:
                     current_pos = pygame.math.Vector2(event.pos)
