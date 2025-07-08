@@ -1,5 +1,6 @@
 # backend.py
 import collections
+from constants import MAP_WIDTH
 from events import Event, EventType
 from map_generator import generate_map
 from hex_utils import wrapped_hex_distance, hex_neighbors

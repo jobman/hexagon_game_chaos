@@ -94,20 +94,27 @@ class PygameFrontend:
         py = y - self.camera_offset.y
         
         map_pixel_width = self.hex_size * 3/2 * MAP_WIDTH
-        world_instance = round(px / map_pixel_width)
-        px_in_world = px - world_instance * map_pixel_width
+        world_instance_offset = round(px / map_pixel_width) * map_pixel_width
+        px_in_world = px - world_instance_offset
 
-        # Convert pixel to offset coordinates first
-        col_frac = px_in_world * 2/3 / self.hex_size
-        row_frac = (py / (self.hex_size * math.sqrt(3))) - (col_frac / 2)
+        # Fractional axial coordinates
+        q_frac = (2/3 * px_in_world) / self.hex_size
+        r_frac = (-1/3 * px_in_world + math.sqrt(3)/3 * py) / self.hex_size
         
-        # Round to nearest offset coordinate
-        col = round(col_frac)
-        row = round(row_frac)
+        # Hex rounding
+        q = round(q_frac)
+        r = round(r_frac)
+        s = round(-q_frac - r_frac)
 
-        # Convert offset back to axial for game logic
-        q = col
-        r = row - (col - (col & 1)) // 2
+        q_diff = abs(q - q_frac)
+        r_diff = abs(r - r_frac)
+        s_diff = abs(s - (-q_frac - r_frac))
+
+        if q_diff > r_diff and q_diff > s_diff:
+            q = -r - s
+        elif r_diff > s_diff:
+            r = -q - s
+        
         return q, r
 
     def _get_unit_at_hex(self, hex_coords):
@@ -117,9 +124,26 @@ class PygameFrontend:
                 return unit_id
         return None
         
-    def _get_visible_hex_range(self):
-        points_to_check = [(0, 0), (SCREEN_WIDTH, 0), (SCREEN_WIDTH, SCREEN_HEIGHT), (0, SCREEN_HEIGHT)]
-        return [self._pixel_to_hex(x, y) for x, y in points_to_check]
+    def _get_visible_hexes(self):
+        """Calculates all hexes currently visible in the viewport."""
+        visible_hexes = set()
+        state = self.backend.get_game_state()
+        if not state.grid:
+            return []
+
+        map_pixel_width = self.hex_size * 3/2 * MAP_WIDTH
+        world_offsets = [0, -map_pixel_width, map_pixel_width]
+
+        for q, r in state.grid.keys():
+            for offset in world_offsets:
+                pos_x, pos_y = self._axial_to_pixel(q, r, world_x_offset=offset)
+                # Check if the hex is within the screen bounds (with a margin)
+                if -self.hex_size < pos_x < SCREEN_WIDTH + self.hex_size and \
+                   -self.hex_size < pos_y < SCREEN_HEIGHT + self.hex_size:
+                    visible_hexes.add((q, r))
+                    break  # Found as visible, no need to check other wrapped worlds
+        
+        return list(visible_hexes)
 
     def _draw_hex(self, surface, color, pos_x, pos_y, border_color=(50, 50, 50), border_width=2):
         points = []
@@ -226,7 +250,7 @@ class PygameFrontend:
 
             self.screen.fill((20, 20, 30))
             self._draw_game_state()
-            self.ui_manager.draw(self.screen, self._get_visible_hex_range())
+            self.ui_manager.draw(self.screen, self._get_visible_hexes())
             pygame.display.flip()
             clock.tick(60)
         pygame.quit()

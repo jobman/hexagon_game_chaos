@@ -3,6 +3,7 @@ import pygame
 import math
 from frontend_visuals import TILE_COLORS, DEFAULT_TILE_COLOR
 from constants import MAP_WIDTH, MAP_HEIGHT
+from hex_utils import hex_neighbors
 
 class Minimap:
     def __init__(self, backend, rect):
@@ -10,6 +11,8 @@ class Minimap:
         self.rect = rect
         self.font = pygame.font.SysFont("Arial", 12)
         self.terrain_cache = None
+        self.scale_x = 1
+        self.scale_y = 1
         self._create_terrain_cache()
 
     def _create_terrain_cache(self):
@@ -20,26 +23,31 @@ class Minimap:
         self.cache_surface = pygame.Surface(self.rect.size)
         self.cache_surface.fill((10, 20, 30)) # Dark blue background
 
-        # Determine the scale to fit the entire rectangular map
-        # Effective map dimensions in hex units for odd-q layout
+        # Determine the scale to fit the entire rectangular map, stretching it.
         map_hex_width = MAP_WIDTH * 1.5 + 0.5
         map_hex_height = MAP_HEIGHT * math.sqrt(3) + (math.sqrt(3) / 2)
 
-        scale_x = self.rect.width / map_hex_width
-        scale_y = self.rect.height / map_hex_height
-        self.scale = min(scale_x, scale_y)
-        self.hex_size = self.scale
+        self.scale_x = self.rect.width / map_hex_width
+        self.scale_y = self.rect.height / map_hex_height
 
         for (q, r), data in state.grid.items():
             col = q
             row = r + (q - (q & 1)) // 2
 
             # Use relative coordinates for drawing on the cache surface
-            pixel_x = self.hex_size * 1.5 * col
-            pixel_y = self.hex_size * math.sqrt(3) * (row + 0.5 * (col & 1))
+            pixel_x = self.scale_x * (1.5 * col)
+            pixel_y = self.scale_y * (math.sqrt(3) * (row + 0.5 * (col & 1)))
 
             color = TILE_COLORS.get(data['tile'], DEFAULT_TILE_COLOR)
-            pygame.draw.circle(self.cache_surface, color, (pixel_x, pixel_y), self.hex_size * 0.9)
+            
+            # Use an ellipse to draw a stretched circle
+            ellipse_rect = pygame.Rect(
+                pixel_x - self.scale_x * 0.9,
+                pixel_y - self.scale_y * 0.9,
+                self.scale_x * 1.8,
+                self.scale_y * 1.8
+            )
+            pygame.draw.ellipse(self.cache_surface, color, ellipse_rect)
         
         self.terrain_cache = self.cache_surface
 
@@ -50,8 +58,8 @@ class Minimap:
         col = q
         row = r + (q - (q & 1)) // 2
 
-        pixel_x = self.hex_size * 1.5 * col
-        pixel_y = self.hex_size * math.sqrt(3) * (row + 0.5 * (col & 1))
+        pixel_x = self.scale_x * (1.5 * col)
+        pixel_y = self.scale_y * (math.sqrt(3) * (row + 0.5 * (col & 1)))
         return pixel_x, pixel_y
 
     def draw(self, surface, viewport_hexes):
@@ -62,29 +70,44 @@ class Minimap:
         pygame.draw.rect(surface, (100, 100, 100), self.rect, 1) # Border
 
         if viewport_hexes:
-            # Convert hexes to pixel coordinates relative to the minimap surface
-            points = [self._axial_to_minimap_pixel(q, r) for q, r in viewport_hexes]
+            original_clip = surface.get_clip()
 
-            # Check if the viewport is split across the wrap boundary
+            # Adjust the clipping rectangle to be slightly smaller on the right
+            hex_width_on_minimap = self.scale_x * 1.5
+            adjusted_clip_rect = self.rect.copy()
+            adjusted_clip_rect.width -= hex_width_on_minimap
+            surface.set_clip(adjusted_clip_rect)
+
+            viewport_hexes_set = set(viewport_hexes)
             q_coords = sorted([h[0] for h in viewport_hexes])
             is_split = (q_coords[-1] - q_coords[0]) > (MAP_WIDTH / 2)
+            minimap_pixel_width = self.scale_x * 1.5 * MAP_WIDTH
 
-            # Offset all points to be on the main screen
-            screen_points = [(p[0] + self.rect.left, p[1] + self.rect.top) for p in points]
+            outline_color = (255, 255, 255) # White outline
 
-            if is_split:
-                # Separate points into two polygons for each side of the map
-                points_left = [p for p, h in zip(screen_points, viewport_hexes) if h[0] >= MAP_WIDTH / 2]
-                points_right = [p for p, h in zip(screen_points, viewport_hexes) if h[0] < MAP_WIDTH / 2]
-
-                # To make the right side appear on the left, we create a wrapped copy
-                minimap_pixel_width = self.hex_size * 1.5 * MAP_WIDTH
-                points_right_wrapped = [(p[0] + minimap_pixel_width, p[1]) for p in points_right]
+            for q, r in viewport_hexes:
+                is_perimeter = False
+                for neighbor_q, neighbor_r in hex_neighbors((q, r)):
+                    wrapped_neighbor = (neighbor_q % MAP_WIDTH, neighbor_r)
+                    if wrapped_neighbor not in viewport_hexes_set:
+                        is_perimeter = True
+                        break
                 
-                # Draw both polygons
-                if len(points_left) > 1: pygame.draw.polygon(surface, (255, 255, 0), points_left, 2)
-                if len(points_right_wrapped) > 1: pygame.draw.polygon(surface, (255, 255, 0), points_right_wrapped, 2)
-            else:
-                # If not split, draw a single polygon
-                if len(screen_points) > 1:
-                    pygame.draw.polygon(surface, (255, 255, 0), screen_points, 2)
+                if is_perimeter:
+                    pixel_x, pixel_y = self._axial_to_minimap_pixel(q, r)
+                    screen_x = pixel_x + self.rect.left
+                    screen_y = pixel_y + self.rect.top
+
+                    ellipse_rect = pygame.Rect(
+                        screen_x - self.scale_x * 0.9,
+                        screen_y - self.scale_y * 0.9,
+                        self.scale_x * 1.8,
+                        self.scale_y * 1.8
+                    )
+                    pygame.draw.ellipse(surface, outline_color, ellipse_rect, 1)
+
+                    if is_split and q < MAP_WIDTH / 2:
+                        wrapped_ellipse_rect = ellipse_rect.move(minimap_pixel_width, 0)
+                        pygame.draw.ellipse(surface, outline_color, wrapped_ellipse_rect, 1)
+
+            surface.set_clip(original_clip)
