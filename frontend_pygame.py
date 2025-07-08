@@ -7,7 +7,7 @@ from events import EventType
 from frontend_visuals import TILE_COLORS, DEFAULT_TILE_COLOR, UNIT_VISUALS, DEFAULT_UNIT_VISUAL, CITY_CENTER_COLOR, CITY_NAME_COLOR
 from unit_types import UnitType
 from ui.ui_manager import UIManager
-from constants import SCREEN_WIDTH, SCREEN_HEIGHT
+from constants import SCREEN_WIDTH, SCREEN_HEIGHT, MAP_WIDTH
 
 # Константы для отрисовки
 CLICK_DRAG_THRESHOLD = 5
@@ -46,12 +46,9 @@ class PygameFrontend:
         
         self.ui_manager.update(self.selected_object_data)
 
-    def _draw_city(self, surface, city_data):
-        """Рисует центр города и его название."""
-        center_hex = city_data['center_hex']
-        
+    def _draw_city(self, surface, city_data, pos_x, pos_y):
+        """Рисует центр города и его название по заданным пиксельным координатам."""
         # Рисуем звезду в центре города
-        pos_x, pos_y = self._hex_to_pixel(*center_hex)
         size = self.hex_size * 0.5
         points = []
         for i in range(10):
@@ -89,18 +86,12 @@ class PygameFrontend:
         
         return culling_range, corner_hexes
 
-    def _draw_unit(self, surface, unit_data):
-        """Рисует одного юнита в соответствии с его типом."""
-        q, r = unit_data["position"]
-        pos_x, pos_y = self._hex_to_pixel(q, r)
-        
-        # Получаем визуальные свойства для этого типа юнита
+    def _draw_unit(self, surface, unit_data, pos_x, pos_y):
+        """Рисует одного юнита по заданным пиксельным координатам."""
         unit_type = unit_data['type']
         visual = UNIT_VISUALS.get(unit_type, DEFAULT_UNIT_VISUAL)
-        
         size = self.hex_size * 0.6
         
-        # Рисуем фигуру
         if visual.shape == 'circle':
             pygame.draw.circle(surface, visual.color, (pos_x, pos_y), size)
         elif visual.shape == 'square':
@@ -114,29 +105,41 @@ class PygameFrontend:
             ]
             pygame.draw.polygon(surface, visual.color, points)
             
-        # Рисуем символ юнита
         symbol_font = pygame.font.SysFont("Arial", int(size * 1.5))
         text = symbol_font.render(visual.symbol, True, (0,0,0))
         text_rect = text.get_rect(center=(pos_x, pos_y))
         surface.blit(text, text_rect)
 
-        # Отрисовка выделения
         if unit_data['id'] == self.selected_unit_id:
             pygame.draw.circle(surface, (255, 255, 0), (pos_x, pos_y), self.hex_size * 0.7, 3)
 
-    def _hex_to_pixel(self, q, r):
-        world_x = self.hex_size * (3.0 / 2.0 * q)
+    def _hex_to_pixel(self, q, r, q_offset=0):
+        """Преобразует гекс-координаты в экранные, с учетом зацикливания по q."""
+        world_x = self.hex_size * (3.0 / 2.0 * (q + q_offset))
         world_y = self.hex_size * (math.sqrt(3) / 2.0 * q + math.sqrt(3) * r)
         screen_x = world_x + SCREEN_WIDTH / 2 + self.camera_offset.x
         screen_y = world_y + SCREEN_HEIGHT / 2 + self.camera_offset.y
         return screen_x, screen_y
 
     def _pixel_to_hex(self, x, y):
+        """Преобразует экранные координаты в гекс-координаты с учетом зацикливания."""
+        # Сначала находим ближайший гекс в основной (не смещенной) системе координат
         world_x = x - SCREEN_WIDTH / 2 - self.camera_offset.x
         world_y = y - SCREEN_HEIGHT / 2 - self.camera_offset.y
+        
+        # Ширина мира в пикселях
+        map_pixel_width = self.hex_size * (3.0 / 2.0 * MAP_WIDTH)
+        
+        # Нормализуем world_x, чтобы он находился в пределах одной ширины карты
+        # Это важно для правильного преобразования обратно в гексы
+        world_x = world_x % map_pixel_width
+
         q = (2.0 / 3.0 * world_x) / self.hex_size
         r = (-1.0 / 3.0 * world_x + math.sqrt(3) / 3.0 * world_y) / self.hex_size
-        return self._hex_round(q, r)
+        
+        # Округляем до ближайшего целого гекса и применяем зацикливание по q
+        q_round, r_round = self._hex_round(q, r)
+        return q_round % MAP_WIDTH, r_round
 
     def _hex_round(self, q, r):
         s = -q - r
@@ -154,8 +157,10 @@ class PygameFrontend:
     
     def _get_unit_at_hex(self, hex_coords):
         state = self.backend.get_game_state()
+        # Учитываем зацикливание при поиске юнита
+        wrapped_hex = (hex_coords[0] % MAP_WIDTH, hex_coords[1])
         for unit_id, unit_data in state.units.items():
-            if tuple(unit_data["position"]) == hex_coords:
+            if tuple(unit_data["position"]) == wrapped_hex:
                 return unit_id
         return None
         
@@ -164,67 +169,72 @@ class PygameFrontend:
         Вычисляет 4 угловых гекса, видимых на экране.
         Возвращает список из 4 кортежей (q,r).
         """
-        points_to_check = [
-            (0, 0), (SCREEN_WIDTH, 0), (SCREEN_WIDTH, SCREEN_HEIGHT), (0, SCREEN_HEIGHT)
-        ]
-        # Просто конвертируем 4 угла и возвращаем как есть
+        points_to_check = [(0, 0), (SCREEN_WIDTH, 0), (SCREEN_WIDTH, SCREEN_HEIGHT), (0, SCREEN_HEIGHT)]
         visible_hexes = [self._pixel_to_hex(x, y) for x, y in points_to_check]
         return visible_hexes
 
-    def _draw_hex(self, surface, color, q, r, border_color=(50, 50, 50), border_width=2):
+    def _draw_hex(self, surface, color, pos_x, pos_y, border_color=(50, 50, 50), border_width=2):
+        """Рисует гекс по заданным пиксельным координатам."""
         points = []
-        center_x, center_y = self._hex_to_pixel(q, r)
         for i in range(6):
             angle_deg = 60 * i
             angle_rad = math.pi / 180 * angle_deg
             points.append(
-                (center_x + self.hex_size * math.cos(angle_rad),
-                 center_y + self.hex_size * math.sin(angle_rad))
+                (pos_x + self.hex_size * math.cos(angle_rad),
+                 pos_y + self.hex_size * math.sin(angle_rad))
             )
         pygame.draw.polygon(surface, color, points)
         if border_width > 0:
             pygame.draw.polygon(surface, border_color, points, border_width)
 
-    def _draw_game_state(self, culling_range):
+    def _draw_game_state(self):
         """
-        Основная функция отрисовки. Рисует только видимые объекты.
-        Принимает диапазон для отсечения.
+        Основная функция отрисовки. Рисует все видимые объекты с учетом зацикливания.
         """
         state = self.backend.get_game_state()
         
-        # Распаковываем полученный диапазон
-        min_q, max_q, min_r, max_r = culling_range
+        # Ширина мира в пикселях для смещения
+        map_q_width = MAP_WIDTH
+        
+        # Смещения для отрисовки копий мира для бесшовного перехода
+        q_offsets = [0, -map_q_width, map_q_width]
 
-        # Отрисовка сетки
-        for q in range(min_q, max_q + 1): # <-- Теперь здесь нет ошибки
-            for r in range(min_r, max_r + 1):
-                if (q, r) in state.grid:
-                    hex_data = state.grid[(q, r)]
-                    tile_type = hex_data['tile']
-                    color = TILE_COLORS.get(tile_type, DEFAULT_TILE_COLOR)
-                    self._draw_hex(self.screen, color, q, r)
+        # --- Отрисовка сетки и подсветки ходов ---
+        for q, r in state.grid:
+            hex_data = state.grid[(q, r)]
+            tile_type = hex_data['tile']
+            color = TILE_COLORS.get(tile_type, DEFAULT_TILE_COLOR)
+            
+            is_valid_move = (q, r) in self.valid_moves
+            
+            for q_offset in q_offsets:
+                pos_x, pos_y = self._hex_to_pixel(q, r, q_offset)
+                
+                # Простая отсечка за пределами экрана
+                if -self.hex_size < pos_x < SCREEN_WIDTH + self.hex_size and \
+                   -self.hex_size < pos_y < SCREEN_HEIGHT + self.hex_size:
+                    
+                    border_color = (255, 255, 0) if is_valid_move else (50, 50, 50)
+                    border_width = 3 if is_valid_move else 2
+                    self._draw_hex(self.screen, color, pos_x, pos_y, border_color, border_width)
 
-        # Отрисовка подсветки доступных ходов
-        if self.selected_unit_id is not None:
-            for move in self.valid_moves:
-                # Получаем исходный цвет тайла
-                hex_data = state.grid.get(move)
-                if hex_data:
-                    tile_type = hex_data['tile']
-                    original_color = TILE_COLORS.get(tile_type, DEFAULT_TILE_COLOR)
-                    self._draw_hex(self.screen, original_color, move[0], move[1], border_color=(255, 255, 0), border_width=2)
-
-        # Отрисовка городов
+        # --- Отрисовка городов ---
         for city_id, city_data in state.cities.items():
             q, r = city_data['center_hex']
-            if min_q <= q <= max_q and min_r <= r <= max_r:
-                self._draw_city(self.screen, city_data)
+            for q_offset in q_offsets:
+                pos_x, pos_y = self._hex_to_pixel(q, r, q_offset)
+                if -self.hex_size < pos_x < SCREEN_WIDTH + self.hex_size and \
+                   -self.hex_size < pos_y < SCREEN_HEIGHT + self.hex_size:
+                    self._draw_city(self.screen, city_data, pos_x, pos_y)
 
-        # Отрисовка юнитов
+        # --- Отрисовка юнитов ---
         for unit_id, unit_data in state.units.items():
             q, r = unit_data["position"]
-            if min_q <= q <= max_q and min_r <= r <= max_r:
-                self._draw_unit(self.screen, unit_data)
+            for q_offset in q_offsets:
+                pos_x, pos_y = self._hex_to_pixel(q, r, q_offset)
+                if -self.hex_size < pos_x < SCREEN_WIDTH + self.hex_size and \
+                   -self.hex_size < pos_y < SCREEN_HEIGHT + self.hex_size:
+                    self._draw_unit(self.screen, unit_data, pos_x, pos_y)
     
     def _handle_input(self):
         for event in pygame.event.get():
@@ -253,24 +263,22 @@ class PygameFrontend:
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 # Проверяем, что клик был не по UI
                 if not self.ui_manager.ui_rect.collidepoint(event.pos):
-                    if event.button == 4 or event.button == 5:
+                    if event.button == 4 or event.button == 5: # Zoom
                         mouse_pos = pygame.math.Vector2(event.pos)
                         screen_center = pygame.math.Vector2(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
-                        world_pixel_before_zoom = mouse_pos - screen_center - self.camera_offset
-                        old_size = self.hex_size
-                        if event.button == 4:
-                            self.hex_size *= ZOOM_SPEED
-                        else:
-                            self.hex_size /= ZOOM_SPEED
+                        world_pixel_before_zoom = (mouse_pos - screen_center - self.camera_offset) / self.hex_size
+                        
+                        if event.button == 4: self.hex_size *= ZOOM_SPEED
+                        else: self.hex_size /= ZOOM_SPEED
                         self.hex_size = max(MIN_HEX_SIZE, min(MAX_HEX_SIZE, self.hex_size))
-                        if old_size == 0: old_size = 0.0001
-                        scale_factor = self.hex_size / old_size
-                        new_world_pixel = world_pixel_before_zoom * scale_factor
-                        self.camera_offset = mouse_pos - screen_center - new_world_pixel
-                    elif event.button == 1:
+                        
+                        new_world_pixel_pos = world_pixel_before_zoom * self.hex_size
+                        self.camera_offset = mouse_pos - screen_center - new_world_pixel_pos
+
+                    elif event.button == 1: # Drag start
                         self.is_dragging = True
                         self.drag_start_pos = pygame.math.Vector2(event.pos)
-                    elif event.button == 3:
+                    elif event.button == 3: # Right-click (move unit)
                         if self.selected_unit_id is not None:
                             clicked_hex = self._pixel_to_hex(*event.pos)
                             move_successful = self.backend.move_unit(self.selected_unit_id, clicked_hex)
@@ -280,7 +288,7 @@ class PygameFrontend:
                 if event.button == 1 and self.is_dragging:
                     self.is_dragging = False
                     drag_distance = self.drag_start_pos.distance_to(event.pos)
-                    if drag_distance < CLICK_DRAG_THRESHOLD:
+                    if drag_distance < CLICK_DRAG_THRESHOLD: # Click
                         clicked_hex = self._pixel_to_hex(*event.pos)
                         unit_id = self._get_unit_at_hex(clicked_hex)
                         if unit_id is not None:
@@ -310,13 +318,16 @@ class PygameFrontend:
             self._update_selection_data()
 
             # --- ВЫЧИСЛЕНИЕ ДАННЫХ ДЛЯ ОТРИСОВКИ (ОДИН РАЗ ЗА КАДР) ---
-            culling_range, viewport_hexes = self._calculate_viewport_data()
+            # culling_range, viewport_hexes = self._calculate_viewport_data()
 
             # --- ОТРИСОВКА ---
             self.screen.fill((20, 20, 30))
-            # Передаем диапазон для оптимизации
-            self._draw_game_state(culling_range)
-            # Передаем угловые точки для рамки миникарты
+            
+            # Основная отрисовка мира
+            self._draw_game_state()
+            
+            # Отрисовка UI поверх всего
+            viewport_hexes = self._get_visible_hex_range()
             self.ui_manager.draw(self.screen, viewport_hexes)
             
             pygame.display.flip()
