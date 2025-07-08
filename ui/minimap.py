@@ -21,8 +21,9 @@ class Minimap:
         self.cache_surface.fill((10, 20, 30)) # Dark blue background
 
         # Determine the scale to fit the entire rectangular map
-        map_hex_width = MAP_WIDTH * 1.5
-        map_hex_height = MAP_HEIGHT * math.sqrt(3)
+        # Effective map dimensions in hex units for odd-q layout
+        map_hex_width = MAP_WIDTH * 1.5 + 0.5
+        map_hex_height = MAP_HEIGHT * math.sqrt(3) + (math.sqrt(3) / 2)
 
         scale_x = self.rect.width / map_hex_width
         scale_y = self.rect.height / map_hex_height
@@ -33,11 +34,11 @@ class Minimap:
             col = q
             row = r + (q - (q & 1)) // 2
 
-            pixel_x = self.rect.left + self.hex_size * 1.5 * col
-            pixel_y = self.rect.top + self.hex_size * math.sqrt(3) * (row + 0.5 * (col & 1))
+            # Use relative coordinates for drawing on the cache surface
+            pixel_x = self.hex_size * 1.5 * col
+            pixel_y = self.hex_size * math.sqrt(3) * (row + 0.5 * (col & 1))
 
             color = TILE_COLORS.get(data['tile'], DEFAULT_TILE_COLOR)
-            # Draw small circles for performance and aesthetics
             pygame.draw.circle(self.cache_surface, color, (pixel_x, pixel_y), self.hex_size * 0.9)
         
         self.terrain_cache = self.cache_surface
