@@ -219,6 +219,11 @@ class PygameFrontend:
             self._process_game_events()
             self._update_selection_data()
 
+            # --- Camera Wrapping Logic ---
+            map_pixel_width = self.hex_size * 3/2 * MAP_WIDTH
+            # Wrap the camera offset to keep it within the bounds of one map width
+            self.camera_offset.x = self.camera_offset.x % -map_pixel_width
+
             self.screen.fill((20, 20, 30))
             self._draw_game_state()
             self.ui_manager.draw(self.screen, self._get_visible_hex_range())
