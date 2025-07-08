@@ -4,55 +4,39 @@ from constants import MAP_WIDTH
 
 Hex = Tuple[int, int]
 
-# Направления для гексагональной сетки (axial coordinates)
+# Axial coordinates are used for all game logic (pathfinding, distances, etc.)
 HEX_DIRECTIONS = [
     (1, 0), (1, -1), (0, -1), 
     (-1, 0), (-1, 1), (0, 1)
 ]
 
 def hex_add(hex1: Hex, hex2: Hex) -> Hex:
-    """Складывает две гексагональные координаты."""
     return (hex1[0] + hex2[0], hex1[1] + hex2[1])
 
 def hex_subtract(hex1: Hex, hex2: Hex) -> Hex:
-    """Вычитает одну гексагональную координату из другой."""
     return (hex1[0] - hex2[0], hex1[1] - hex2[1])
 
-def hex_wrap(h: Hex) -> Hex:
-    """Обеспечивает зацикливание по горизонтали (ось q)."""
-    q, r = h
-    return (q % MAP_WIDTH, r)
-
 def hex_distance(hex1: Hex, hex2: Hex) -> int:
-    """Рассчитывает расстояние между двумя гексами с учетом зацикливания."""
-    # Учитываем зацикливание по оси q
-    q1, r1 = hex1
-    q2, r2 = hex2
-
-    # Находим кратчайшее расстояние по q, учитывая зацикливание
-    q_dist = abs(q1 - q2)
-    wrapped_q_dist = min(q_dist, MAP_WIDTH - q_dist)
-    
-    # Прямое расстояние по q и r без зацикливания
-    direct_dist_vec = hex_subtract(hex1, hex2)
-    
-    # Если кратчайший путь лежит через край карты, нужно скорректировать r
-    if wrapped_q_dist != q_dist:
-        # Это сложная часть гексагонального зацикливания.
-        # Для простоты пока будем использовать эвристику, которая хорошо работает для axial coordinates.
-        # Более точный расчет потребовал бы преобразования в кубические координаты.
-        # В нашем случае, изменение q влияет на r, но для большинства игровых механик
-        # достаточно аппроксимации.
-        r_dist = abs(r1 - r2)
-        # Простая аппроксимация, может быть неточной в некоторых случаях
-        return max(wrapped_q_dist, r_dist, (wrapped_q_dist + r_dist) // 2)
-    else:
-        # Стандартный расчет расстояния для axial coordinates
-        return (abs(direct_dist_vec[0]) + abs(direct_dist_vec[1]) + abs(direct_dist_vec[0] + direct_dist_vec[1])) // 2
+    """Calculates the distance between two hexes in axial coordinates."""
+    vec = hex_subtract(hex1, hex2)
+    return (abs(vec[0]) + abs(vec[1]) + abs(vec[0] + vec[1])) // 2
 
 def hex_neighbors(h: Hex) -> list[Hex]:
-    """Возвращает список соседних гексов с учетом зацикливания."""
-    return [hex_wrap(hex_add(h, direction)) for direction in HEX_DIRECTIONS]
+    """Gets the 6 neighbors of a hex in axial coordinates."""
+    return [hex_add(h, direction) for direction in HEX_DIRECTIONS]
+
+def wrapped_hex_distance(hex1: Hex, hex2: Hex) -> int:
+    """Calculates the shortest distance between two hexes on a wrapping map."""
+    # Direct distance
+    dist = hex_distance(hex1, hex2)
+    
+    # Distance when wrapping across the map edge
+    # We check wrapping in both directions (e.g., hex2 is to the left or right)
+    dist_wrap_pos = hex_distance(hex1, (hex2[0] + MAP_WIDTH, hex2[1]))
+    dist_wrap_neg = hex_distance(hex1, (hex2[0] - MAP_WIDTH, hex2[1]))
+    
+    return min(dist, dist_wrap_pos, dist_wrap_neg)
+
 
 # Для интерполяции и рисования линий
 def _lerp(a, b, t):

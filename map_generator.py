@@ -1,44 +1,40 @@
 # map_generator.py
 import random
+import math
 from perlin_noise import PerlinNoise
 from tile_types import TileType
-from hex_utils import hex_distance
 from constants import MAP_WIDTH, MAP_HEIGHT
+
+def offset_to_axial(col: int, row: int) -> tuple[int, int]:
+    """Converts odd-q offset coordinates to axial coordinates."""
+    q = col
+    r = row - (col - (col & 1)) // 2
+    return (q, r)
 
 def generate_map() -> dict:
     """
-    Генерирует прямоугольную карту с использованием шума Перлина.
-    Возвращает словарь: { (q, r): {'tile': TileType} }
+    Generates a rectangular map using offset coordinates for layout,
+    but stores them as axial coordinates in the grid.
+    This creates a seamless, wrapping world.
     """
     grid = {}
-    
-    # Инициализация шума Перлина для создания континентов
     noise = PerlinNoise(octaves=4, seed=random.randint(1, 100))
-    
-    for q in range(MAP_WIDTH):
-        for r in range(MAP_HEIGHT):
-            # Используем q, r напрямую для прямоугольной карты
-            
-            # Генерация ландшафта с помощью шума Перлина
-            # Масштабируем координаты для получения более крупных и плавных форм
-            noise_val = noise([q / (MAP_WIDTH * 0.5), r / (MAP_HEIGHT * 0.5)])
-            
-            # Применяем радиальный градиент, чтобы в центре было больше суши
-            # Это создаст ощущение "мира" с океанами по краям, но карта все равно будет зациклена
-            center_q, center_r = MAP_WIDTH / 2, MAP_HEIGHT / 2
-            dist_q = abs(q - center_q)
-            dist_r = abs(r - center_r)
-            # Мы не используем hex_distance, так как нам нужен градиент для прямоугольной области
-            dist_normalized = max(dist_q / center_q, dist_r / center_r)
-            
-            # Уменьшаем значение шума к краям карты, чтобы создать океаны
-            noise_val -= dist_normalized * 0.6
 
-            if noise_val > 0.3:
+    for col in range(MAP_WIDTH):
+        for row in range(MAP_HEIGHT):
+            # Use a seamless noise function for wrapping maps
+            angle = 2 * math.pi * col / MAP_WIDTH
+            x1 = math.cos(angle)
+            y1 = math.sin(angle)
+            x2 = row / MAP_HEIGHT
+
+            noise_val = noise([x1, y1, x2])
+
+            if noise_val > 0.25:
                 tile = TileType.HILLS
-            elif noise_val > 0.15:
+            elif noise_val > 0.1:
                 tile = TileType.FOREST
-            elif noise_val > 0:
+            elif noise_val > -0.05:
                 tile = TileType.GRASS
             elif noise_val > -0.15:
                 tile = TileType.SAND
@@ -47,6 +43,7 @@ def generate_map() -> dict:
             else:
                 tile = TileType.DEEP_WATER
             
-            grid[(q, r)] = {'tile': tile}
+            axial_coord = offset_to_axial(col, row)
+            grid[axial_coord] = {'tile': tile}
             
     return grid
