@@ -22,7 +22,7 @@ class UIManager:
         end_turn_rect = pygame.Rect(minimap_width + action_panel_width, self.ui_rect.top, end_turn_width, self.ui_rect.height)
 
         # Создаем экземпляры каждой панели
-        self.minimap = Minimap(minimap_rect, backend)
+        self.minimap = Minimap(backend, minimap_rect)
         self.action_panel = ActionPanel(action_panel_rect, backend)
         self.end_turn_panel = EndTurnPanel(end_turn_rect, backend)
 
