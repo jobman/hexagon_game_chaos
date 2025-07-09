@@ -11,12 +11,10 @@ class GameState:
     def __init__(self):
         self.grid = {}
         self.units = {}
-        self.cities = {}
         self.turn_number = 1
         self.active_player = 0
         self.players = [0, 1]
         self.next_unit_id = 0
-        self.next_city_id = 0
 
 class Backend:
     def __init__(self):
@@ -53,28 +51,7 @@ class Backend:
 
         self._post_event(EventType.NEXT_PLAYER_TURN, {'player_id': self.game_state.active_player})
 
-    def found_city(self, unit_id: int, city_name: str):
-        if unit_id not in self.game_state.units: return False
-
-        unit = self.game_state.units[unit_id]
-        if not UNIT_PROPERTIES[unit['type']].can_found_city: return False
-
-        position = unit['position']
-        for city in self.game_state.cities.values():
-            if wrapped_hex_distance(position, city['center_hex']) < 4:
-                return False
-
-        city_id = self.game_state.next_city_id
-        new_city = {
-            'id': city_id, 'name': city_name, 'owner_player_id': unit['player'],
-            'center_hex': position, 'population': 1
-        }
-        self.game_state.cities[city_id] = new_city
-        self.game_state.next_city_id += 1
-        del self.game_state.units[unit_id]
-        
-        self._post_event(EventType.CITY_FOUNDED, {'city_data': new_city, 'consumed_unit_id': unit_id})
-        return True
+    
 
     def create_unit(self, unit_type: UnitType, player: int, position: tuple):
         unit_id = self.game_state.next_unit_id

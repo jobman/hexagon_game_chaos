@@ -2,7 +2,7 @@
 import pygame
 import math
 from events import EventType
-from frontend_visuals import TILE_COLORS, DEFAULT_TILE_COLOR, UNIT_VISUALS, DEFAULT_UNIT_VISUAL, CITY_CENTER_COLOR, CITY_NAME_COLOR
+from frontend_visuals import TILE_COLORS, DEFAULT_TILE_COLOR, UNIT_VISUALS, DEFAULT_UNIT_VISUAL
 from unit_types import UnitType
 from ui.ui_manager import UIManager
 from constants import SCREEN_WIDTH, SCREEN_HEIGHT, MAP_WIDTH
@@ -40,19 +40,7 @@ class PygameFrontend:
             self.selected_object_data = None
         self.ui_manager.update(self.selected_object_data)
 
-    def _draw_city(self, surface, city_data, pos_x, pos_y):
-        size = self.hex_size * 0.5
-        points = []
-        for i in range(10):
-            angle = math.pi / 5 * i
-            radius = size if i % 2 == 0 else size * 0.4
-            points.append((pos_x + radius * math.sin(angle), pos_y - radius * math.cos(angle)))
-        pygame.draw.polygon(surface, CITY_CENTER_COLOR, points)
-        
-        name_font = pygame.font.SysFont("Arial", 16, bold=True)
-        text = name_font.render(city_data['name'], True, CITY_NAME_COLOR)
-        text_rect = text.get_rect(midbottom=(pos_x, pos_y - self.hex_size * 0.6))
-        surface.blit(text, text_rect)
+    
 
     def _draw_unit(self, surface, unit_data, pos_x, pos_y):
         unit_type = unit_data['type']
@@ -172,13 +160,7 @@ class PygameFrontend:
                     border_width = 3 if is_valid_move else 2
                     self._draw_hex(self.screen, color, pos_x, pos_y, border_color, border_width)
 
-        for city_data in state.cities.values():
-            q, r = city_data['center_hex']
-            for offset in world_offsets:
-                pos_x, pos_y = self._axial_to_pixel(q, r, offset)
-                if -self.hex_size < pos_x < SCREEN_WIDTH + self.hex_size and \
-                   -self.hex_size < pos_y < SCREEN_HEIGHT + self.hex_size:
-                    self._draw_city(self.screen, city_data, pos_x, pos_y)
+        
 
         for unit_data in state.units.values():
             q, r = unit_data["position"]
@@ -194,12 +176,7 @@ class PygameFrontend:
             
             ui_action = self.ui_manager.handle_event(event)
             if ui_action:
-                if ui_action == 'FOUND_CITY' and self.selected_unit_id is not None:
-                    city_name = f"Город {self.backend.game_state.next_city_id}"
-                    if self.backend.found_city(self.selected_unit_id, city_name):
-                        self.selected_unit_id = None
-                        self.valid_moves = []
-                elif ui_action == 'END_TURN': self.backend.end_turn()
+                if ui_action == 'END_TURN': self.backend.end_turn()
                 continue 
 
             if event.type == pygame.MOUSEBUTTONDOWN:

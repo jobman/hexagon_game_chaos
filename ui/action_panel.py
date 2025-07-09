@@ -24,8 +24,7 @@ class ActionPanel:
 
         obj_type = selected_object_data.get('type')
 
-        if obj_type == UnitType.SETTLER:
-            self._add_button("Основать город", "FOUND_CITY")
+        
 
     def _add_button(self, text, action_id):
         button_width, button_height = 150, 40

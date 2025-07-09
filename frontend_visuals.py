@@ -47,6 +47,3 @@ UNIT_VISUALS = {
 }
 
 DEFAULT_UNIT_VISUAL = UnitVisualData(shape='circle', color=(255, 0, 255), symbol='?')
-
-CITY_CENTER_COLOR = (255, 255, 150) # Светло-желтый
-CITY_NAME_COLOR = (240, 240, 240)
